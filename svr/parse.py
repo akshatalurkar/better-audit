@@ -8,7 +8,7 @@ def extract_from_html(file_path):
 
     output_lines = []
 
-    #Obtaining GPA value from the HTML file here
+    #Getting GPA value from the HTML file here
     gpa_value = None
     for label_td in soup.find_all('td', class_='gpalabel'):
         if 'GPA' in label_td.get_text():
@@ -21,18 +21,21 @@ def extract_from_html(file_path):
     else:
         output_lines.append("GPA: Not found\n")
 
-    #Obtaining classes taken from the HTML file here
+    #Getting classes taken from the HTML file here
     output_lines.append("Classes Taken:")
 
     #Setting up ordering logic
     classes_list = []
     quarter_order = {
-        "FA": 1,
-        "WI": 2,
-        "SP": 3,
-        "S1": 4,
-        "S2": 5
+        "WI": 1,
+        "SP": 2,
+        "S1": 3,
+        "S2": 4,
+        "FA": 5
     }
+
+    #Setting up duplicate removal logic
+    seen_courses = set()
 
     table_rows = soup.find_all('tr')
     for row in table_rows:
@@ -47,10 +50,12 @@ def extract_from_html(file_path):
             prefix = quarter[:2]
             year_str = quarter[2:]
             if prefix in quarter_order and year_str.isdigit():
-                year = int(year_str)
-                order = quarter_order[prefix]
-                formatted = f"{quarter} {course}"
-                classes_list.append((year, order, formatted))
+                if (quarter, course) not in seen_courses:
+                    seen_courses.add((quarter, course))
+                    year = int(year_str)
+                    order = quarter_order[prefix]
+                    formatted = f"{quarter} {course}"
+                    classes_list.append((year, order, formatted))
 
     classes_list.sort()
 
