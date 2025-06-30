@@ -2,7 +2,6 @@ import sys
 import os
 import importlib.util
 
-# Dynamically import extract_from_html from parse.py
 parse_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'parse.py')
 spec = importlib.util.spec_from_file_location('parse', parse_path)
 if spec is None or spec.loader is None:

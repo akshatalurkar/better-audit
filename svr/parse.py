@@ -8,27 +8,55 @@ def extract_from_html(file_path):
 
     output_lines = []
 
-    # Find the element containing GPA
-    gpa_elem = soup.find(string=lambda text: isinstance(text, str) and "GPA:" in text)
-    if gpa_elem is not None:
-        gpa_text = str(gpa_elem)
-        gpa = gpa_text.split("GPA:")[-1].strip()
-        output_lines.append(f"GPA: {gpa}\n")
+    #Obtaining GPA value from the HTML file here
+    gpa_value = None
+    for label_td in soup.find_all('td', class_='gpalabel'):
+        if 'GPA' in label_td.get_text():
+            gpa_td = label_td.find_previous_sibling('td', class_='gpa number')
+            if gpa_td:
+                gpa_value = gpa_td.get_text(strip=True)
+                break
+    if gpa_value:
+        output_lines.append(f"GPA: {gpa_value}\n")
     else:
         output_lines.append("GPA: Not found\n")
 
+    #Obtaining classes taken from the HTML file here
     output_lines.append("Classes Taken:")
+
+    #Setting up ordering logic
+    classes_list = []
+    quarter_order = {
+        "FA": 1,
+        "WI": 2,
+        "SP": 3,
+        "S1": 4,
+        "S2": 5
+    }
+
     table_rows = soup.find_all('tr')
     for row in table_rows:
-        # Ensure row is a Tag before calling find_all
         if not isinstance(row, Tag):
             continue
         cells = row.find_all('td')
         if len(cells) >= 3:
             quarter = cells[0].text.strip()
             course = cells[1].text.strip()
-            if course and any(q in quarter for q in ["FA", "WI", "SP", "S1", "S2"]):
-                output_lines.append(f"{quarter} {course}")
+
+            #Fixing the detection of WIP credit elements
+            prefix = quarter[:2]
+            year_str = quarter[2:]
+            if prefix in quarter_order and year_str.isdigit():
+                year = int(year_str)
+                order = quarter_order[prefix]
+                formatted = f"{quarter} {course}"
+                classes_list.append((year, order, formatted))
+
+    classes_list.sort()
+
+    for _, _, formatted in classes_list:
+        output_lines.append(formatted)
+
     output_lines.append("")
 
     output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output.txt")
