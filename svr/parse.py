@@ -1,6 +1,50 @@
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 import os
+import re
+
+def parse_course_line(line):
+    tokens = [t.strip() for t in line.split(',')]
+    parsed_courses = []
+    current_department = None
+
+    #Handling interchangeable courses (honors/non-honors)
+    for token in tokens:
+        token = token.strip(", ")
+
+        if "OR" in token:
+            or_parts = [part.strip() for part in token.split("OR")]
+            or_courses = []
+            for part in or_parts:
+                match = re.match(r"([A-Z]+)\s+(\d+\w*)", part)
+                if match:
+                    department, id = match.groups()
+                    department = department.strip(", ")
+                    id = id.strip(", ")
+                    current_department = department
+                    or_courses.append(f"{department} {id}")
+                else:
+                    match_number = re.match(r"(\d+\w*)", part)
+                    if match_number and current_department:
+                        id = match_number.group(1).strip(", ")
+                        or_courses.append(f"{current_department} {id}")
+            if or_courses:
+                parsed_courses.append(", ".join(or_courses))
+        else:
+            match = re.match(r"([A-Z]+)\s+(\d+\w*)", token)
+            if match:
+                department, id = match.groups()
+                department = department.strip(", ")
+                id = id.strip(", ")
+                current_department = department
+                parsed_courses.append(f"{department} {id}")
+            else:
+                match_number = re.match(r"(\d+\w*)", token)
+                if match_number and current_department:
+                    id = match_number.group(1).strip(", ")
+                    parsed_courses.append(f"{current_department} {id}")
+
+    return parsed_courses
 
 def extract_from_html(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -42,9 +86,10 @@ def extract_from_html(file_path):
         if not isinstance(row, Tag):
             continue
         cells = row.find_all('td')
-        if len(cells) >= 3:
+        if len(cells) >= 4:
             quarter = cells[0].text.strip()
             course = cells[1].text.strip()
+            letter_grade = cells[3].text.strip()
 
             #Fixing the detection of WIP credit elements
             prefix = quarter[:2]
@@ -54,13 +99,29 @@ def extract_from_html(file_path):
                     seen_courses.add((quarter, course))
                     year = int(year_str)
                     order = quarter_order[prefix]
-                    formatted = f"{quarter} {course}"
+                    formatted = f"{quarter} {course} {letter_grade}"
                     classes_list.append((year, order, formatted))
 
     classes_list.sort()
 
     for _, _, formatted in classes_list:
         output_lines.append(formatted)
+
+    output_lines.append("")
+
+    output_lines.append("Needs:")
+
+    needs_tables = soup.find_all('table', class_='selectcourses')
+    for table in needs_tables:
+        if isinstance(table, Tag):
+            from_list = table.find('td', class_='fromcourselist')
+            if from_list:
+                raw_text = from_list.get_text(separator=" ", strip = True)
+                lines = raw_text.split('\n')
+                for line in lines:
+                    parsed_courses = parse_course_line(line)
+                    for course in parsed_courses:
+                        output_lines.append(course)
 
     output_lines.append("")
 
